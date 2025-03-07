@@ -1,0 +1,1212 @@
+---
+title: "Tutorial 5 - ARIMA Models and Simulation"
+subtitle: "Understanding Model Components Through Simulation"
+description: "This tutorial explores ARIMA model components and their behavior through simulation, laying the groundwork for model identification and selection"
+embed-resources: true
+output: 
+  tufte::tufte_html:
+    css: 
+      - ../tutorial-styles.css
+    tufte_variant: "envisioned"
+    highlight: pygments
+    includes:
+      in_header: 
+        - <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  pdf_document:
+    latex_engine: xelatex
+    keep_tex: true
+link-citations: true
+code-fold: show
+---
+
+<!-- Add download and GitHub links at the top -->
+<div class="download-links">
+  <a href="index.pdf" download>
+    <i class="fa fa-file-pdf-o"></i> Download PDF version
+  </a>
+  <br>
+  <a href="https://github.com/advanced-financial-data-analytics/tutorial5" target="_blank">
+    <i class="fa fa-github"></i> View source on GitHub
+  </a>
+</div>
+
+<style>
+.solution {
+  background-color: #f5f5f5;
+  border-left: 5px solid #4CAF50;
+  padding: 10px;
+  margin-bottom: 15px;
+}
+</style>
+
+```{r setup, include=FALSE}
+rm=ls()
+rm(list = rm)
+library(fpp2)
+library(tidyverse)
+library(lubridate)
+library(timetk)
+library(tidyquant)
+library(gridExtra)
+library(tseries)
+library(ggplot2)
+library(forecast)  # For ggAcf and ggPacf
+knitr::opts_chunk$set(
+	message = FALSE,
+	warning = FALSE,
+	echo = TRUE,
+	eval = TRUE,
+	comment = "#<"
+)
+```
+
+# Learning Outcomes
+
+1. Understand the behavior of AR, MA, and ARMA processes through simulation
+2. Identify patterns in ACF and PACF that correspond to different models
+3. Apply the Box-Jenkins approach to model identification
+4. Begin the model selection process for financial time series
+
+# Quick Recap: Stationarity and Transformation
+
+In Tutorial 5, we covered:
+
+- Stationarity: constant mean, variance, and autocorrelation structure
+- Identifying non-stationarity through time plots and ACF/PACF
+- Transformations to achieve stationarity including differencing and Box-Cox transformations
+
+Now we'll build on these concepts to understand ARIMA model components and begin the model selection process.
+
+# Part 1: Understanding ARIMA Components Through Simulation
+
+ARIMA (AutoRegressive Integrated Moving Average) models have three components:
+
+- AR: AutoRegressive terms (p)
+- I: Integrated/differencing terms (d)
+- MA: Moving Average terms (q)
+
+Let's explore each component through simulation to understand their behavior.
+
+## Exercise 1: AutoRegressive (AR) Processes
+
+AR models use past values of the series to predict future values. An AR(p) model is:
+
+$$y_t = c + \phi_1 y_{t-1} + \phi_2 y_{t-2} + ... + \phi_p y_{t-p} + \varepsilon_t$$
+
+First, let's create an AR(1) simulation function:
+
+```{r ar1-function}
+ar1 <- function(phi, n=100, mean=0) {
+  y <- ts(numeric(n))
+  e <- rnorm(n)
+  y[1] <- rnorm(1)  # Random start
+  for(i in 2:n)
+    y[i] <- mean + phi*y[i-1] + e[i]
+  return(y)
+}
+```
+
+Now, let's simulate AR(1) models with different parameters:
+
+```{r ar1-simulation}
+# Create a 2x2 grid of simulations with different phi values
+# After creating your simulated AR(1) models
+set.seed(123) # For reproducibility
+ar1_06 <- ar1(0.6)
+ar1_095 <- ar1(0.95)
+ar1_005 <- ar1(0.05)
+ar1_neg065 <- ar1(-0.65)
+
+# Create time series plots using ggplot2
+p1 <- autoplot(ar1_06) + 
+  ggtitle(expression(paste("AR(1) with ", phi[1], " = 0.6"))) + 
+  theme(plot.title = element_text(size=12)) +
+  xlab("Time") + ylab("Value")
+
+p2 <- autoplot(ar1_095) + 
+  ggtitle(expression(paste("AR(1) with ", phi[1], " = 0.95"))) + 
+  theme(plot.title = element_text(size=12)) +
+  xlab("Time") + ylab("Value")
+
+p3 <- autoplot(ar1_005) + 
+  ggtitle(expression(paste("AR(1) with ", phi[1], " = 0.05"))) + 
+  theme(plot.title = element_text(size=12)) +
+  xlab("Time") + ylab("Value")
+
+p4 <- autoplot(ar1_neg065) + 
+  ggtitle(expression(paste("AR(1) with ", phi[1], " = -0.65"))) + 
+  theme(plot.title = element_text(size=12)) +
+  xlab("Time") + ylab("Value")
+
+# Arrange plots with spacing
+grid.arrange(p1, p2, p3, p4, ncol=2, nrow=2,
+             widths=c(4, 4),
+             heights=c(4, 4),
+             padding=unit(0.5, "line"))
+```
+
+Now let's examine the ACF and PACF patterns for these processes:
+
+```{r ar1-acf-pacf, fig.width=9, fig.height=12}
+# Add this before your plotting code
+# Create ACF and PACF plots using ggplot
+p1 <- ggAcf(ar1_06) + ggtitle(expression(paste("ACF: AR(1) with ", phi[1], " = 0.6"))) + theme(plot.title = element_text(size=10))
+p2 <- ggPacf(ar1_06) + ggtitle(expression(paste("PACF: AR(1) with ", phi[1], " = 0.6"))) + theme(plot.title = element_text(size=10))
+p3 <- ggAcf(ar1_095) + ggtitle(expression(paste("ACF: AR(1) with ", phi[1], " = 0.95"))) + theme(plot.title = element_text(size=10))
+p4 <- ggPacf(ar1_095) + ggtitle(expression(paste("PACF: AR(1) with ", phi[1], " = 0.95"))) + theme(plot.title = element_text(size=10))
+p5 <- ggAcf(ar1_005) + ggtitle(expression(paste("ACF: AR(1) with ", phi[1], " = 0.05"))) + theme(plot.title = element_text(size=10))
+p6 <- ggPacf(ar1_005) + ggtitle(expression(paste("PACF: AR(1) with ", phi[1], " = 0.05"))) + theme(plot.title = element_text(size=10))
+p7 <- ggAcf(ar1_neg065) + ggtitle(expression(paste("ACF: AR(1) with ", phi[1], " = -0.65"))) + theme(plot.title = element_text(size=10))
+p8 <- ggPacf(ar1_neg065) + ggtitle(expression(paste("PACF: AR(1) with ", phi[1], " = -0.65"))) + theme(plot.title = element_text(size=10))
+
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, ncol=2, 
+             heights=rep(c(3, 3, 3, 3)), 
+             widths=c(4, 4),
+             padding=unit(0.5, "line"))
+```
+
+> a. Describe how the time series pattern changes as phi_1 varies.
+
+<div class="solution">
+The time series pattern changes significantly as the AR(1) coefficient phi_1 varies:
+
+**$\phi_1$ = 0.6 (moderate positive autocorrelation):**
+- Shows moderate persistence where values tend to stay on the same side of the mean for several periods
+- Displays relatively smooth transitions between values
+- Returns to the mean at a moderate rate
+
+**$\phi_1$ = 0.95 (strong positive autocorrelation):**
+- Exhibits very high persistence with long swings away from the mean
+- Shows the slowest mean reversion, creating long cycles
+- Resembles a random walk (though still technically stationary)
+- Creates the appearance of temporary trends
+
+**$\phi_1$ = 0.05 (very weak autocorrelation):**
+- Behaves almost like white noise with minimal persistence
+- Shows rapid fluctuations around the mean
+- Displays very little memory of previous values
+- Quick mean reversion
+
+**$\phi_1$ = -0.65 (moderate negative autocorrelation):**
+- Creates an oscillating pattern with frequent sign changes
+- Shows rapid alternation between positive and negative values
+- Tends to overcompensate for previous deviations from the mean
+- Creates a jagged, rapid-fluctuating appearance
+
+The closer $\phi_1$ is to 1, the more persistent the series becomes (approaching non-stationarity at $\phi_1$ = 1). Negative values of $\phi_1$ create oscillatory behavior, with larger negative values producing more pronounced oscillations.
+</div>
+
+> b. For each value of $\phi_1$, identify the pattern in the ACF and PACF.
+
+<div class="solution">
+The ACF and PACF patterns vary with different $\phi_1$ values:
+
+**$\phi_1$ = 0.6:**
+
+- ACF: Shows a gradual exponential decay ($\rho_k = 0.6^k$ for lag k)
+- PACF: Shows a sharp cutoff after lag 1 with a significant spike at lag 1 (≈ 0.6)
+
+**$\phi_1$ = 0.95:**
+
+- ACF: Shows a very slow exponential decay, remaining significant for many lags
+- PACF: Shows a sharp cutoff after lag 1 with a large spike at lag 1 (≈ 0.95)
+
+**$\phi_1$ = 0.05:**
+
+- ACF: Shows a very rapid decay, becoming insignificant after lag 1
+- PACF: Shows a sharp cutoff after lag 1 with a small but significant spike at lag 1 (≈ 0.05)
+
+**$\phi_1$ = -0.65:**
+
+- ACF: Shows a damped oscillatory pattern, alternating between positive and negative values
+- PACF: Shows a sharp cutoff after lag 1 with a negative spike at lag 1 (≈ -0.65)
+
+These patterns confirm the theoretical properties of AR(1) models: the ACF decays exponentially at rate $\phi_1$, while the PACF has a single significant spike at lag 1 equal to $\phi_1$.
+</div>
+
+> c. Based on the lecture, explain why the ACF "dies out" gradually while the PACF has a sharp cutoff at lag 1 for AR(1) processes.
+
+<div class="solution">
+The different patterns in ACF and PACF for AR(1) processes can be explained by their theoretical properties:
+
+**Why the ACF dies out gradually:**
+
+In an AR(1) process defined as $y_t = \phi_1 y_t-1 + ε_t$, the theoretical autocorrelation function is:
+  
+$$ρ_k = \phi_1^k \text{for lag k} ≥ 1$$
+
+This is an exponential decay pattern. The correlation between observations k periods apart is the AR coefficient raised to the power k. When $|\phi_1| < 1$ (required for stationarity), this value gradually decreases toward zero as k increases. The rate of decay depends on the magnitude of $\phi_1$:
+- Values closer to 1 produce slower decay
+- Values closer to 0 produce faster decay
+- Negative values produce oscillating decay
+
+**Why the PACF has a sharp cutoff:**
+The partial autocorrelation at lag k measures the correlation between $y_t$ and $y_{t-k}$ after removing the effects of the intermediate lags $(y_{t-1}, y_{t-2}, ..., y_{t-k+1})$.
+
+For an AR(1) process:
+- The correlation between $y_t$ and $y_{t-1}$ is direct and equal to $phi_1$
+- For lags k > 1, once we control for $y_{t-1}$, there is no direct connection between $y_t$ and $y_{t-k}$
+
+This happens because in an AR(1) process, $y_t$ is only directly influenced by $y_{t-1}$, not by values from earlier periods. Any apparent correlation with earlier lags is fully explained by the chain of lag-1 relationships. Therefore, the PACF is $phi_1$ at lag 1 and 0 at all lags greater than 1.
+
+This property is what makes PACF particularly useful for identifying the order (p) of AR processes.
+</div>
+
+> d. Which of these models appear similar to patterns you might see in financial returns?
+
+<div class="solution">
+
+Among the simulated AR(1) models, the one with $\phi_1$ = 0.05 most closely resembles typical financial return series for several reasons:
+
+1. **Low persistence:** Financial returns typically show very little autocorrelation due to market efficiency, similar to the weak correlation in the $\phi_1$ = 0.05 model.
+
+2. **Mean reversion:** Returns tend to fluctuate around a central mean (often near zero), just as this model quickly reverts to its mean.
+
+3. **Limited predictability:** The weak AR coefficient implies limited predictability from past values, consistent with the difficulty of forecasting financial returns.
+
+4. **Rapid fluctuations:** The quick changes and limited memory in this model align with the rapid price adjustments in efficient markets.
+
+This resemblance is consistent with the Efficient Market Hypothesis, which suggests returns should be largely unpredictable from past returns. However, it's worth noting that actual financial returns often exhibit:
+
+- Heavier tails than normal distributions (extreme events are more common)
+- Volatility clustering (periods of high volatility tend to persist)
+- Occasional structural breaks
+
+These features would require more complex models (like GARCH) to capture fully. The AR(1) with $\phi_1$ = 0.05 captures the baseline weak autocorrelation structure but misses these more complex characteristics.
+</div>
+
+## Exercise 2: Moving Average (MA) Processes
+
+MA models use past errors to predict future values. An MA(q) model is:
+
+$$y_t = c + \varepsilon_t + \theta_1 \varepsilon_{t-1} + \theta_2 \varepsilon_{t-2} + ... + \theta_q \varepsilon_{t-q}$$
+
+Let's create an MA(1) simulation function:
+
+```{r ma1-function}
+ma1 <- function(theta, n=100) {
+  y <- ts(numeric(n))
+  e <- rnorm(n+1) # Need n+1 because we use e[i-1]
+  for(i in 2:n)
+    y[i] <- theta*e[i-1] + e[i]
+  return(y)
+}
+```
+
+Now, let's simulate MA(1) models with different parameters:
+
+```{r ma1-simulation}
+set.seed(123)
+ma1_06 <- ma1(0.6)
+ma1_095 <- ma1(0.95)
+ma1_005 <- ma1(0.05)
+ma1_neg08 <- ma1(-0.8)
+
+# MA(1) plots
+p1 <- autoplot(ma1_06) + ggtitle(expression(paste("MA(1) with ", theta[1], " = 0.6")))
+p2 <- autoplot(ma1_095) + ggtitle(expression(paste("MA(1) with ", theta[1], " = 0.95")))
+p3 <- autoplot(ma1_005) + ggtitle(expression(paste("MA(1) with ", theta[1], " = 0.05")))
+p4 <- autoplot(ma1_neg08) + ggtitle(expression(paste("MA(1) with ", theta[1], " = -0.8")))
+
+grid.arrange(p1, p2, p3, p4, nrow=2)
+```
+
+And their ACF and PACF patterns:
+
+```{r ma1-acf-pacf, fig.width=10, fig.height=12}
+# Create ACF and PACF plots using ggplot
+p1 <- ggAcf(ma1_06) + 
+  ggtitle(expression(paste("ACF: MA(1) with ", theta[1], " = 0.6"))) + 
+  theme(plot.title = element_text(size=10))
+
+p2 <- ggPacf(ma1_06) + 
+  ggtitle(expression(paste("PACF: MA(1) with ", theta[1], " = 0.6"))) + 
+  theme(plot.title = element_text(size=10))
+
+p3 <- ggAcf(ma1_095) + 
+  ggtitle(expression(paste("ACF: MA(1) with ", theta[1], " = 0.95"))) + 
+  theme(plot.title = element_text(size=10))
+
+p4 <- ggPacf(ma1_095) + 
+  ggtitle(expression(paste("PACF: MA(1) with ", theta[1], " = 0.95"))) + 
+  theme(plot.title = element_text(size=10))
+
+p5 <- ggAcf(ma1_005) + 
+  ggtitle(expression(paste("ACF: MA(1) with ", theta[1], " = 0.05"))) + 
+  theme(plot.title = element_text(size=10))
+
+p6 <- ggPacf(ma1_005) + 
+  ggtitle(expression(paste("PACF: MA(1) with ", theta[1], " = 0.05"))) + 
+  theme(plot.title = element_text(size=10))
+
+p7 <- ggAcf(ma1_neg08) + 
+  ggtitle(expression(paste("ACF: MA(1) with ", theta[1], " = -0.8"))) + 
+  theme(plot.title = element_text(size=10))
+
+p8 <- ggPacf(ma1_neg08) + 
+  ggtitle(expression(paste("PACF: MA(1) with ", theta[1], " = -0.8"))) + 
+  theme(plot.title = element_text(size=10))
+
+# Arrange plots with spacing
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, ncol=2, 
+             heights=rep(c(3, 3, 3, 3)), 
+             widths=c(4, 4),
+             padding=unit(0.5, "line"))
+```
+
+> a. How does the time series pattern change as $\theta_1$ varies?
+
+<div class="solution">
+The time series pattern of MA(1) processes changes in the following ways as theta_1 varies:
+
+**$\theta_1$ = 0.6 (moderate positive MA coefficient):**
+
+- Shows limited memory where each observation is affected by the current and previous error
+- Displays more random-looking fluctuations than an AR process with the same coefficient
+- No persistent deviations from the mean
+
+**$\theta_1$ = 0.95 (strong positive MA coefficient):**
+
+- Creates stronger connection between consecutive observations
+- Still lacks the long persistent swings seen in AR models
+- Shows more pronounced short-term dependencies
+- Each error has a strong effect on two consecutive observations
+
+**$\theta_1$ = 0.05 (very weak MA coefficient):**
+
+- Behaves almost like pure white noise
+- Shows minimal impact of previous errors
+- Highly unpredictable pattern with almost no visible structure
+
+**$\theta_1$ = -0.8 (strong negative MA coefficient):**
+
+- Creates negative correlation between consecutive observations
+- Tends to show reversals (positive values followed by negative, and vice versa)
+- Produces a "jittery" pattern with frequent reversals
+
+Unlike AR processes, MA processes don't show long-term persistence regardless of coefficient value, as the effect of each shock is limited to a finite number of future observations (in this case, just one future observation).
+</div>
+
+> b. For each value of $\theta_1$, identify the pattern in the ACF and PACF.
+
+<div class="solution">
+The ACF and PACF patterns vary distinctively with different $\theta_1$ values:
+
+**$\theta_1$ = 0.6:**
+
+- ACF: Shows a single significant spike at lag 1 (≈ 0.6/(1+0.6²) ≈ 0.51) and cuts off to zero after lag 1
+- PACF: Shows a gradually decaying pattern with the first value approximately 0.51, and subsequent values declining
+
+**$\theta_1$ = 0.95:**
+
+- ACF: Shows a single large significant spike at lag 1 (≈ 0.69) and cuts off to zero
+- PACF: Shows a slow decay with alternating signs, but remaining significant for many lags
+
+**$\theta_1$ = 0.05:**
+
+- ACF: Shows a very small spike at lag 1 (≈ 0.05) that may barely cross significance threshold
+- PACF: Shows very small values at all lags, resembling white noise
+
+**$\theta_1$ = -0.8:**
+
+- ACF: Shows a single significant negative spike at lag 1 (≈ -0.62) and cuts off to zero
+- PACF: Shows a decaying pattern with alternating signs, starting with the negative value at lag 1
+
+These patterns demonstrate the key characteristics of MA(1) processes: the ACF has a single significant spike at lag 1 and cuts off, while the PACF gradually decays. This is exactly the opposite pattern of AR(1) processes.
+</div>
+
+> c. How does the ACF and PACF pattern of MA processes differ from AR processes?
+
+<div class="solution">
+The ACF and PACF patterns of MA and AR processes exhibit opposite behaviors:
+
+**MA Processes:**
+
+- **ACF:** Shows a sharp cutoff after lag q (the order of the MA process)
+- **PACF:** Shows a gradual decay or damped oscillation
+
+**AR Processes:**
+
+- **ACF:** Shows a gradual decay or damped oscillation
+- **PACF:** Shows a sharp cutoff after lag p (the order of the AR process)
+
+This difference creates a clear identification pattern:
+
+1. If the ACF cuts off sharply while the PACF decays gradually, this suggests an MA process
+2. If the PACF cuts off sharply while the ACF decays gradually, this suggests an AR process
+
+The theoretical explanation is:
+
+- In an MA(q) process, correlation is directly limited to q lags (the error term only affects q future observations)
+- In an AR(p) process, each observation directly affects only the next p observations, but indirectly affects all future observations through the recursive structure
+
+This contrasting behavior is a fundamental tool for model identification in the Box-Jenkins methodology discussed in the lecture.
+</div>
+
+> d. From these simulations, what's the key feature that helps you distinguish between AR and MA processes?
+
+<div class="solution">
+The key feature that helps distinguish between AR and MA processes is the contrasting behavior of their ACF and PACF functions:
+
+**Key Distinguishing Features:**
+
+1. **Pattern of "decay vs. cutoff":**
+   - AR processes: ACF decays gradually while PACF cuts off after lag p
+   - MA processes: ACF cuts off after lag q while PACF decays gradually
+
+2. **Persistence in the time series:**
+   - AR processes (especially with coefficients near 1) show persistent deviations from the mean
+   - MA processes show limited memory with no long-term persistence regardless of coefficient values
+
+3. **Long-term behavior:**
+   - AR processes can show long swings that appear trend-like in small samples
+   - MA processes always revert quickly to the mean with no sustained movements
+
+4. **Response to shocks:**
+   - AR processes: shocks have diminishing but theoretically infinite effects
+   - MA processes: shocks have larger immediate effects but disappear completely after q periods
+
+When identifying models from real data, examining whether the ACF or PACF displays the sharper cutoff pattern is the most reliable indicator for distinguishing between AR and MA processes. This is why plotting both functions is a standard first step in the Box-Jenkins model identification approach.
+</div>
+
+## Exercise 3: ARMA and Non-Stationary Processes
+
+Let's examine more complex models:
+
+```{r arma-ar2}
+# Create ARMA(1,1) function
+arma11 <- function(phi, theta, n=100) {
+  y <- ts(numeric(n))
+  e <- rnorm(n+1)
+  y[1] <- e[1]
+  for(i in 2:n)
+    y[i] <- phi*y[i-1] + theta*e[i-1] + e[i]
+  return(y)
+}
+
+# Create AR(2) function
+ar2 <- function(phi1, phi2, n=100) {
+  y <- ts(numeric(n))
+  e <- rnorm(n)
+  y[1] <- e[1]
+  y[2] <- phi1*y[1] + e[2]
+  for(i in 3:n)
+    y[i] <- phi1*y[i-1] + phi2*y[i-2] + e[i]
+  return(y)
+}
+
+# Simulate and plot
+set.seed(123)
+arma11_series <- arma11(0.6, 0.6)
+ar2_series <- ar2(-0.8, 0.3)
+ar2_nonstat <- ar2(1.3, -0.7)
+
+# ARMA and AR(2) plots
+p1 <- autoplot(arma11_series) + ggtitle(expression(paste("ARMA(1,1) with ", phi[1], " = 0.6, ", theta[1], " = 0.6")))
+p2 <- autoplot(ar2_series) + ggtitle(expression(paste("AR(2) with ", phi[1], " = -0.8, ", phi[2], " = 0.3")))
+p3 <- autoplot(ar2_nonstat) + ggtitle(expression(paste("Non-stationary AR(2) with ", phi[1], " = 1.3, ", phi[2], " = -0.7")))
+
+grid.arrange(p1, p2, p3, nrow=3)
+```
+
+Let's check the ACF and PACF of these more complex models:
+
+```{r complex-acf-pacf, fig.width=10, fig.height=9}
+# Create ACF and PACF plots using ggplot for complex models
+p1 <- ggAcf(arma11_series) + 
+  ggtitle(expression(paste("ACF: ARMA(1,1) with ", phi[1], " = 0.6, ", theta[1], " = 0.6"))) + 
+  theme(plot.title = element_text(size=10))
+
+p2 <- ggPacf(arma11_series) + 
+  ggtitle(expression(paste("PACF: ARMA(1,1) with ", phi[1], " = 0.6, ", theta[1], " = 0.6"))) + 
+  theme(plot.title = element_text(size=10))
+
+p3 <- ggAcf(ar2_series) + 
+  ggtitle(expression(paste("ACF: AR(2) with ", phi[1], " = -0.8, ", phi[2], " = 0.3"))) + 
+  theme(plot.title = element_text(size=10))
+
+p4 <- ggPacf(ar2_series) + 
+  ggtitle(expression(paste("PACF: AR(2) with ", phi[1], " = -0.8, ", phi[2], " = 0.3"))) + 
+  theme(plot.title = element_text(size=10))
+
+p5 <- ggAcf(ar2_nonstat) + 
+  ggtitle(expression(paste("ACF: Non-stationary AR(2) with ", phi[1], " = 1.3, ", phi[2], " = -0.7"))) + 
+  theme(plot.title = element_text(size=10))
+
+p6 <- ggPacf(ar2_nonstat) + 
+  ggtitle(expression(paste("PACF: Non-stationary AR(2) with ", phi[1], " = 1.3, ", phi[2], " = -0.7"))) + 
+  theme(plot.title = element_text(size=10))
+
+# Arrange plots with spacing
+grid.arrange(p1, p2, p3, p4, p5, p6, ncol=2, 
+             heights=c(3, 3, 3),
+             widths=c(4, 4),
+             padding=unit(0.5, "line"))
+```
+
+> a. Describe the pattern in the non-stationary AR(2) model. How does it differ from the stationary AR(2)?
+
+<div class="solution">
+
+The non-stationary AR(2) model with $\phi_1$ = 1.3 and $\phi_2$ = -0.7 displays markedly different characteristics from the stationary AR(2) model:
+
+**Non-stationary AR(2) pattern:**
+
+- Shows explosive, increasingly large oscillations over time
+- The amplitude of the oscillations grows progressively larger
+- Exhibits a clear pattern of unstable behavior
+- Does not remain within any fixed range
+- Displays no tendency to revert to a constant mean
+
+**Contrast with stationary AR(2) ($\phi_1$ = -0.8, $\phi_2$ = 0.3):**
+
+- Shows consistent oscillations that remain bounded
+- Maintains a relatively stable amplitude throughout
+- Regularly returns to and fluctuates around the mean
+- Exhibits a clear cyclical pattern without explosive growth
+- The overall variance of the process appears constant over time
+
+The key difference is that the non-stationary process shows no tendency to return to equilibrium but instead develops ever-larger deviations from its starting point. This explosive behavior is characteristic of processes where the AR parameters violate the stationarity conditions.
+</div>
+
+> b. According to the lecture, what condition determines whether an AR(2) process is stationary?
+
+<div class="solution">
+According to the lecture, an AR(2) process is stationary when its parameters satisfy all three of these conditions:
+
+1. $\phi_1 + \phi_2 < 1$
+2. $\phi_2 - \phi_1 < 1$
+3. $|\phi_2| < 1$
+
+These conditions ensure that the roots of the characteristic equation lie outside the unit circle. Another important condition mentioned in the lecture specifically for cyclical behavior in AR(2) processes is:
+
+$\phi_1^2 + 4 \phi_2 < 0$
+
+When this condition is met (and the process is stationary), the AR(2) process will exhibit cyclical behavior, with the average cycle length determined by the formula given in part (d).
+
+The stationarity conditions ensure that shocks to the system diminish over time rather than creating explosive behavior. When these conditions are violated, as in our non-stationary example, the process becomes unstable with ever-increasing deviations from equilibrium.
+</div>
+
+> c. For the AR(2) model, calculate whether it satisfies the stationarity conditions discussed in the lecture.
+
+<div class="solution">
+Let's check whether each AR(2) model satisfies the stationarity conditions:
+
+**Stationary AR(2) with $\phi_1$ = -0.8 and $\phi_2$ = 0.3:**
+
+1. $\phi_1 + \phi_2 < 1$:
+
+  -0.8 + 0.3 = -0.5 < 1 ✓ (Condition satisfied)
+
+2. $\phi_2 - \phi_1 < 1 \text{should be} \phi_2 - \phi_1 > -1$
+
+   Checking this corrected condition:
+   0.3 - (-0.8) = 1.1 > -1 ✓ (Condition satisfied)
+
+3. $|\phi_2| < 1$:
+
+   |0.3| = 0.3 < 1 ✓ (Condition satisfied)
+
+This is confusing because the process appears stationary in the simulation but fails one condition. However, there was a typo in the lecture notes. The correct second condition should be:
+
+2. $\phi_2 - \phi_1 < 1 \text{should be} \phi_2 - \phi_1 > -1$
+
+Checking this corrected condition:
+0.3 - (-0.8) = 1.1 > -1 ✓ (Condition satisfied)
+
+So the "stationary" AR(2) does satisfy all the correct stationarity conditions.
+
+**Non-stationary AR(2) with $\phi_1$ = 1.3 and $\phi_2$ = -0.7:**
+
+1. $\phi_1 + \phi_2 < 1$:
+
+   1.3 + (-0.7) = 0.6 < 1 ✓ (Condition satisfied)
+
+2. $\phi_2 - \phi_1 > -1$ (corrected condition):
+
+   -0.7 - 1.3 = -2 < -1 ✗ (Condition violated)
+
+3. $|\phi_2| < 1$:
+
+   |-0.7| = 0.7 < 1 ✓ (Condition satisfied)
+
+This confirms that the non-stationary AR(2) violates at least one of the stationarity conditions, explaining its explosive behavior in the simulation.
+</div>
+
+> d. The lecture mentioned that AR(2) models can exhibit cyclic behavior. Calculate the average cycle length for the AR(2) model using the formula from the lecture:
+
+$$
+\text{Average cycle length} = \frac{2\pi}{\arccos\left(\frac{-\phi_1(1-\phi_2)}{4\phi_2}\right)}
+$$
+
+Substituting our values:
+$$
+\begin{align}
+&= \frac{2\pi}{\arccos\left(\frac{-(1.3)(1-0.7)}{4(0.7)}\right)} \\
+&= \frac{2\pi}{\arccos\left(\frac{(-1.3)(0.3)}{2.8}\right)} \\
+&= \frac{2\pi}{\arccos(-0.136)} \\
+&= \frac{2\pi}{1.74} \\
+&= 3.62
+\end{align}
+$$
+</div>
+
+## Exercise 4: Random Walk and Financial Time Series
+
+The random walk model is particularly important in finance. Interestingly, the connection between random walks and financial markets was first explored by French mathematician Louis Bachelier in his 1900 doctoral thesis "Théorie de la Spéculation" (The Theory of Speculation). 
+
+Bachelier's work was revolutionary as he:
+
+1. Developed the mathematics of Brownian motion five years before Einstein's famous paper
+2. Was the first to model stock prices using stochastic processes
+3. Proposed that market prices follow a random walk, where future movements cannot be predicted from past behavior
+4. Laid the mathematical foundations for option pricing theory, decades before Black-Scholes
+
+Bachelier's insights were largely overlooked until the 1950s and 1960s when economists like Paul Samuelson rediscovered his work. His ideas eventually became central to the Efficient Market Hypothesis and modern financial theory.
+
+### Information Asymmetry and Market Efficiency
+
+While the random walk model suggests that price movements are unpredictable, this assumes that all market participants have equal access to information. In reality, information asymmetry exists, and those with privileged information may gain an edge:
+
+- **Inside information**: Those with non-public information about a company (like upcoming earnings surprises or merger plans) can potentially predict price movements before the information becomes public.
+  
+- **Speed of information processing**: Even with public information, market participants who can process information faster may gain temporary advantages.
+  
+- **Levels of market efficiency**: Markets may exhibit different levels of efficiency:
+  * Strong-form efficiency: Even insider information is already reflected in prices (rarely holds in practice)
+  * Semi-strong efficiency: All public information is reflected in prices
+  * Weak-form efficiency: Only historical price information is reflected in prices
+
+When information asymmetry exists, the price series may temporarily deviate from a pure random walk until the information disseminates throughout the market. This creates brief windows where returns become somewhat predictable for those with the **information edge**. This goes some way to explaining how Capital Market firms are early adopters of the latest information and communication technologies.
+
+The race for information advantage has driven significant technological innovation in financial markets:
+
+1. **High-frequency trading**: Firms invest millions in infrastructure to execute trades milliseconds faster than competitors
+2. **Alternative data sources**: Satellite imagery, social media sentiment analysis, and credit card transaction data provide insights before traditional financial reports
+3. **Machine learning algorithms**: Advanced pattern recognition to identify subtle market inefficiencies
+4. **Private communication networks**: Dedicated fiber optic lines between exchanges to minimize latency
+
+This technological arms race represents the practical manifestation of market participants seeking to exploit information asymmetries before they disappear. While these advantages are typically short-lived as technologies diffuse through the market, they create continuous pressure for innovation and can generate substantial profits during the window when information edges exist.
+
+### Non-Negative Price Constraints in Random Walk Models
+
+One limitation of Bachelier's original model was that it allowed prices to become negative, which is unrealistic for most financial assets. To address this, later researchers developed several important modifications:
+
+1. **Geometric Brownian Motion (GBM)**: Introduced by Samuelson (1965), this model applies the random walk to the logarithm of prices rather than prices themselves. By modeling returns (percentage changes) as normally distributed, GBM ensures prices remain positive. This became the foundation of the Black-Scholes option pricing model.
+
+2. **Cox-Ingersoll-Ross (CIR) Process**: Developed in 1985, this model incorporates a "square root diffusion" term that reduces volatility as prices approach zero, preventing them from becoming negative. It's particularly useful for modeling interest rates.
+
+3. **Constant Elasticity of Variance (CEV) Model**: Proposed by Cox (1975), this model allows volatility to depend on the price level, typically decreasing as prices fall, which prevents negative values.
+
+These scientific advances maintain the essential unpredictability of the random walk while imposing the realistic constraint that prices cannot fall below zero, making them more applicable to actual financial markets.
+
+Let's explore the random walk model that Bachelier first conceptualised:
+
+
+```{r random-walk}
+# Random walk function
+random_walk <- function(n=100, drift=0) {
+  e <- rnorm(n)
+  y <- cumsum(drift + e)
+  return(ts(y))
+}
+
+# Simulate and plot
+set.seed(123)
+rw <- random_walk()
+rw_drift <- random_walk(drift=0.1)
+
+p1 <- autoplot(rw) + ggtitle("Random Walk without Drift")
+p2 <- autoplot(rw_drift) + ggtitle("Random Walk with Drift")
+p3 <- autoplot(diff(rw)) + ggtitle("First Difference of Random Walk")
+p4 <- autoplot(diff(rw_drift)) + ggtitle("First Difference of Random Walk with Drift")
+
+grid.arrange(p1, p2, p3, p4, nrow=2)
+```
+
+> a. How would you specify a random walk in ARIMA notation?
+
+<div class="solution">
+
+A random walk can be specified in ARIMA notation as ARIMA(0,1,0) without a constant term.
+
+Breaking this down:
+- p=0: No autoregressive terms
+- d=1: One level of differencing
+- q=0: No moving average terms
+- No constant: Indicates no drift
+
+The mathematical representation is:
+y_t = y_t-1 + ε_t
+
+Or in differenced form:
+(1-B)y_t = ε_t
+
+Where B is the backshift operator (By_t = y_t-1).
+
+This model represents a process where the best prediction of the next value is simply the current value, and changes are completely random and unpredictable. The simulations show this property clearly - the series "wanders" with no tendency to return to any mean value.
+</div>
+
+> b. How does adding a drift term change the behavior of the random walk?
+
+<div class="solution">
+**Solution:** Adding a drift term to a random walk creates a random walk with drift, specified as ARIMA(0,1,0) with a constant. This changes the behavior in several important ways:
+
+**Mathematical representation:**
+y_t = c + y_t-1 + ε_t
+
+Where c is the drift parameter.
+
+**Behavioral changes:**
+1. **Deterministic trend:** The series now has a long-term linear trend in the direction of the drift parameter
+2. **Directional bias:** Positive drift creates an upward trend; negative drift creates a downward trend
+3. **Expected change:** The expected change in each period is now c rather than zero
+4. **Long-term behavior:** Over time, the drift dominates random fluctuations, creating a clearer trend
+
+In our simulation, the random walk with drift (c=0.1) shows a clear upward trend compared to the standard random walk, which shows no directional preference.
+
+In financial terms, a random walk with positive drift might represent an asset price with a long-term positive expected return, where short-term price changes are unpredictable but the long-term trajectory is upward.
+</div>
+
+> c. Explain the relationship between a random walk and financial price series.
+
+<div class="solution">
+
+The random walk model has a fundamental relationship with financial price series:
+
+**Theoretical connections:**
+1. **Efficient Market Hypothesis (EMH):** In its weak form, the EMH suggests that asset prices already reflect all available information, so future price changes should be unpredictable from past prices - exactly what a random walk model implies.
+
+2. **Random Walk Hypothesis:** This financial theory directly states that stock prices follow a random walk, making future movements unpredictable based on past movements.
+
+3. **Martingale property:** Financial theory suggests prices should be martingales (where the expected future value equals the current value), consistent with random walk behavior.
+
+**Empirical evidence:**
+
+- Many financial price series empirically resemble random walks or random walks with drift
+- The first differences of log prices (returns) are often close to white noise
+- Basic statistical tests often fail to reject the random walk hypothesis for major market indices
+
+**Implications:**
+
+- The unpredictability implied by random walk models suggests the difficulty of consistently "beating the market"
+- The non-stationarity of random walks explains why financial analysts typically work with returns rather than price levels
+- Many trading strategies implicitly assume deviations from random walk behavior
+
+The simulated random walk and random walk with drift models in our exercise closely resemble the behavior of many financial price series, with the drift component representing the long-term expected return.
+</div>
+
+> d. The efficient market hypothesis suggests returns should be unpredictable. What ARIMA model would that imply for stock prices?
+
+<div class="solution">
+
+The Efficient Market Hypothesis (EMH) implies specific ARIMA models for stock prices and returns:
+
+**For stock prices:**
+If the EMH holds in its weak form, stock prices should follow a random walk or random walk with drift:
+- ARIMA(0,1,0) without constant: Pure random walk (no expected return)
+- ARIMA(0,1,0) with constant: Random walk with drift (positive expected return)
+
+The mathematical form is:
+$$y_t = c + y_t-1 + ε_t$$
+
+Where c is either zero (no drift) or a small positive constant (with drift).
+
+**For stock returns:**
+
+Returns (first differences of log prices) should be white noise:
+
+- ARIMA(0,0,0) with or without constant
+
+The mathematical form for returns is:
+$$r_t = μ + ε_t$$
+
+Where μ is the mean return (risk premium) and ε_t is white noise.
+
+**Interpretation:**
+
+- The constant in the returns model represents the risk premium - investors require higher expected returns for bearing more risk
+- The white noise component represents the unpredictable part of returns
+- Any significant AR or MA components in returns would suggest market inefficiency (predictability)
+
+This framework aligns with the EMH assertion that past price information cannot be used to predict future price movements in a way that generates excess risk-adjusted returns.
+</div>
+
+# Part 2: Beginning the Model Selection Process
+
+Now that we understand the components of ARIMA models and more realistic price models like Geometric Brownian Motion, let's apply these concepts to financial time series analysis.
+
+## Exercise 5: Comparing Random Walk and Geometric Brownian Motion
+
+Before examining real stock data, let's compare the basic random walk with the more realistic Geometric Brownian Motion (GBM) model:
+
+```{r gbm-simulation}
+# Random walk function (allows negative prices)
+random_walk <- function(n=100, drift=0) {
+  e <- rnorm(n)
+  y <- cumsum(drift + e)
+  return(ts(y))
+}
+
+# Geometric Brownian Motion function (ensures non-negative prices)
+gbm <- function(n=100, mu=0.001, sigma=0.02, S0=100) {
+  # mu: drift parameter (expected return)
+  # sigma: volatility parameter
+  # S0: initial price
+  
+  dt <- 1  # time step (1 day)
+  t <- seq(0, n-1)
+  W <- c(0, cumsum(rnorm(n-1, 0, sqrt(dt))))  # Brownian motion
+  
+  # GBM formula: S(t) = S0 * exp((mu - sigma^2/2)*t + sigma*W(t))
+  S <- S0 * exp((mu - sigma^2/2) * t + sigma * W)
+  return(ts(S))
+}
+
+# Simulate and plot
+set.seed(123)
+rw <- random_walk(n=500, drift=0.1)
+gbm_series <- gbm(n=500, mu=0.001, sigma=0.02)
+
+# Convert to same scale for comparison
+rw_scaled <- exp(rw/10) * 100
+
+p1 <- autoplot(rw_scaled) + 
+  ggtitle("Random Walk (Transformed)") + 
+  ylab("Price") + 
+  theme_minimal()
+
+p2 <- autoplot(gbm_series) + 
+  ggtitle("Geometric Brownian Motion") + 
+  ylab("Price") + 
+  theme_minimal()
+
+p3 <- autoplot(diff(log(rw_scaled))) + 
+  ggtitle("Log Returns of Random Walk") + 
+  ylab("Return") + 
+  theme_minimal()
+
+p4 <- autoplot(diff(log(gbm_series))) + 
+  ggtitle("Log Returns of GBM") + 
+  ylab("Return") + 
+  theme_minimal()
+
+grid.arrange(p1, p2, p3, p4, nrow=2)
+```
+
+> a. Compare the price paths of the transformed random walk and the Geometric Brownian Motion. What key differences do you observe?
+
+<div class="solution">
+
+The key differences between the transformed random walk and Geometric Brownian Motion price paths are:
+
+1. **Non-negativity constraint**: The GBM model naturally ensures prices remain positive, while the transformed random walk only achieves this through artificial transformation.
+
+2. **Return dynamics**: GBM has proportional returns (percentage changes) that are independent of price level, creating a more realistic price evolution where volatility scales with price level. The transformed random walk doesn't naturally have this property.
+
+3. **Path behavior**: GBM shows more realistic price behavior with smaller fluctuations at lower price levels and larger fluctuations at higher price levels, consistent with actual financial assets.
+
+4. **Distributional properties**: GBM prices are log-normally distributed, which better matches empirical observations of financial asset prices, while transformed random walk prices have a different distribution.
+
+5. **Mean reversion**: Neither model shows mean reversion, but GBM has a more natural drift component that represents expected return proportional to the current price level.
+</div>
+
+**Interpretation of KPSS Test Results:**
+
+The KPSS test results for BP log returns (KPSS Level = 0.11274, p-value = 0.1) provide important information about the stationarity of the series:
+
+1. **Null hypothesis**: The KPSS test has a null hypothesis of stationarity, which is the opposite of unit root tests like ADF or PP tests.
+
+2. **Test statistic**: The KPSS Level statistic of 0.11274 is relatively small, suggesting limited evidence against stationarity.
+
+3. **P-value interpretation**: The p-value of 0.1 is greater than the conventional significance level of 0.05, meaning we fail to reject the null hypothesis of stationarity.
+
+4. **Conclusion for log returns**: The test results support the conclusion that BP log returns are stationary, which is consistent with both efficient market theory and the assumptions of the GBM model.
+
+5. **Implications for price series**: Since log returns are stationary, the log prices follow a random walk (with possible drift), and the original price series follows a geometric random walk - precisely what the GBM model describes.
+
+6. **Model selection guidance**: These results support using a GBM model or an ARIMA(0,1,0) model for log prices, rather than more complex ARIMA specifications.
+
+7. **Economic interpretation**: The stationarity of log returns aligns with the efficient market hypothesis, suggesting that BP stock price changes are largely unpredictable from past price movements alone.
+
+This test result is one piece of evidence supporting the use of the GBM model for BP stock prices, as it confirms a key assumption of that model.
+</div>
+
+> b. Why is the GBM model more appropriate for stock prices than the basic random walk?
+
+<div class="solution">
+The GBM model is more appropriate for stock prices than the basic random walk for several key reasons:
+
+1. **Non-negative prices**: GBM mathematically ensures prices remain positive, which is a fundamental requirement for stock prices. The basic random walk allows negative values, which is economically unrealistic.
+
+2. **Proportional returns**: GBM models percentage returns rather than absolute changes, reflecting how investors think about returns and how stocks actually behave. A $1 change has different implications for a $10 stock versus a $100 stock.
+
+3. **Volatility scaling**: In GBM, the volatility of price changes scales with the price level, which matches empirical observations that higher-priced stocks tend to have larger absolute price movements.
+
+4. **Log-normal distribution**: GBM produces a log-normal distribution of prices, which better fits the empirical distribution of stock prices than the normal distribution implied by a basic random walk.
+
+5. **Theoretical foundation**: GBM provides the theoretical foundation for modern option pricing models (Black-Scholes) and is consistent with rational expectations in efficient markets.
+
+6. **Risk-return relationship**: GBM naturally incorporates the risk-return tradeoff through its drift and volatility parameters, which align with financial theory.
+</div>
+
+> c. Compare the log returns of both models. Do they show similar patterns despite the different price processes?
+
+<div class="solution">
+**c. Compare the log returns of both models. Do they show similar patterns despite the different price processes?**
+
+Yes, the log returns of both models show remarkably similar patterns despite the different price processes:
+
+1. **Stationarity**: Both models produce stationary log returns, fluctuating around a constant mean with constant variance.
+
+2. **Independence**: In both cases, the log returns appear to be independent over time, showing no significant autocorrelation pattern.
+
+3. **Normality**: The log returns from both models approximate a normal distribution, which is by design in both cases.
+
+4. **Mean and variance**: Both models can be calibrated to have the same mean and variance of log returns, making them statistically indistinguishable when looking only at returns.
+
+This similarity in log returns explains why both models can appear to fit financial data reasonably well when evaluated only on return properties. However, the GBM model has the advantage of ensuring non-negative prices while maintaining these return characteristics.
+
+The key insight is that while the price paths look different, the underlying return-generating process can be very similar, highlighting why financial analysts often work with returns rather than price levels.
+</div>
+
+> d. How does the GBM model relate to the ARIMA framework we've been studying?
+
+<div class="solution">
+**d. How does the GBM model relate to the ARIMA framework we've been studying?**
+
+The GBM model relates to the ARIMA framework in several important ways:
+
+1. **Log transformation connection**: Taking the logarithm of a GBM process yields a random walk with drift, which is an ARIMA(0,1,0) model with constant. Specifically, if S_t follows GBM, then log(S_t) follows ARIMA(0,1,0) with drift.
+
+2. **Return modeling**: The log returns of a GBM process (diff(log(S_t))) follow an ARIMA(0,0,0) model with constant, which is simply white noise plus a constant term.
+
+3. **Non-stationarity**: Both GBM prices and random walks are non-stationary processes that require differencing (or log-differencing) to achieve stationarity.
+
+4. **Parameter interpretation**: The drift parameter (μ) in GBM corresponds to the constant term in the ARIMA model for log prices, while the volatility parameter (σ) relates to the variance of the error term.
+
+5. **Extensions**: More complex ARIMA models can be viewed as extensions of the basic GBM framework, allowing for autocorrelation in returns that might reflect market inefficiencies.
+
+The key difference is that GBM imposes the non-negativity constraint through the exponential function, making it more suitable for financial asset prices, while the ARIMA framework is more general but doesn't naturally ensure non-negative values.
+</div>
+
+## Exercise 6: Examining BP Stock Price Data with Realistic Models
+
+```{r bp-data}
+# Get BP stock price data
+bp_price <- tq_get("BP", from = "2018-01-01", to = "2023-01-01") %>% 
+  select(date, adjusted)
+
+# Convert to time series
+bp_ts <- ts(bp_price$adjusted, frequency = 252)
+
+# Plot the data
+autoplot(bp_ts) + 
+  ggtitle("BP Stock Price") + 
+  xlab("Time") + 
+  ylab("Adjusted Price")
+```
+
+### Step 1: Assess Stationarity
+```{r bp-model-test}
+# Calculate log returns
+bp_log_returns <- diff(log(bp_ts))
+
+# Plot histogram of returns to check normality (GBM assumption)
+hist_plot <- ggplot(data.frame(returns = as.numeric(bp_log_returns)), aes(x = returns)) +
+  geom_histogram(bins = 50, fill = "steelblue", color = "white") +
+  geom_density(aes(y = ..count.. * 0.2), color = "red") +
+  ggtitle("Distribution of BP Log Returns") +
+  theme_minimal()
+
+# QQ plot to check normality
+qq_plot <- ggplot(data.frame(returns = as.numeric(bp_log_returns)), aes(sample = returns)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle("Q-Q Plot of BP Log Returns") +
+  theme_minimal()
+
+grid.arrange(hist_plot, qq_plot, ncol=2)
+
+# Test stationarity of log returns (should be stationary if GBM)
+kpss_log_returns <- kpss.test(bp_log_returns)
+print(kpss_log_returns)
+
+# Check for autocorrelation in log returns (should be minimal if GBM)
+acf_pacf_plot <- ggtsdisplay(bp_log_returns, main="ACF and PACF of BP Log Returns")
+```
+
+### Step 2: Fit GBM Parameters
+
+```{r bp-gbm-fit}
+# Estimate GBM parameters from data
+mu_hat <- mean(bp_log_returns) * 252  # Annualized drift
+sigma_hat <- sd(bp_log_returns) * sqrt(252)  # Annualized volatility
+
+cat("Estimated GBM parameters for BP stock:\n")
+cat("Drift (mu):", round(mu_hat, 4), "per year\n")
+cat("Volatility (sigma):", round(sigma_hat, 4), "per year\n")
+
+# Simulate future paths using estimated GBM parameters
+simulate_future_paths <- function(S0, mu, sigma, days, paths) {
+  dt <- 1/252  # Daily time step (assuming 252 trading days)
+  t <- seq(0, days) * dt
+  
+  # Initialize matrix to store paths
+  S <- matrix(0, nrow=paths, ncol=length(t))
+  S[,1] <- S0  # Starting price
+  
+  # Simulate each path
+  for(i in 1:paths) {
+    Z <- rnorm(length(t)-1)  # Random shocks
+    for(j in 2:length(t)) {
+      S[i,j] <- S[i,j-1] * exp((mu - sigma^2/2) * dt + sigma * sqrt(dt) * Z[j-1])
+    }
+  }
+  
+  return(S)
+}
+
+# Get last observed price
+S0 <- as.numeric(bp_ts[length(bp_ts)])
+
+# Simulate 100 paths for 252 days (1 year) ahead
+future_paths <- simulate_future_paths(S0, mu_hat, sigma_hat, 252, 100)
+
+# Plot simulated paths
+matplot(future_paths[1:10,], type="l", main="10 Simulated Future Paths for BP Stock",
+        xlab="Trading Days", ylab="Price", col=rainbow(10))
+legend("topleft", legend=paste("Path", 1:10), col=rainbow(10), lty=1:10, cex=0.7)
+```
+
+> a. Based on the tests above, does BP stock price behavior align better with a random walk or a Geometric Brownian Motion model?
+
+<div class="solution">
+The BP stock price behavior aligns better with a Geometric Brownian Motion (GBM) model based on the following evidence:
+
+1. **KPSS test results**: The KPSS test on log returns shows a p-value of 0.1, which is greater than the typical significance level of 0.05. This means we fail to reject the null hypothesis of level stationarity for the log returns. Stationary log returns are consistent with the GBM model.
+
+2. **ACF and PACF patterns**: The ACF and PACF plots of log returns show minimal significant autocorrelation, which is consistent with the independent increments assumption of both GBM and random walk models.
+
+3. **Distribution of returns**: While the histogram and QQ plot show some deviation from perfect normality (particularly in the tails), the overall shape is reasonably close to normal, supporting the GBM assumption of normally distributed log returns.
+
+4. **Non-negativity**: The BP stock price never approaches zero or negative values, which is naturally ensured by the GBM model but not by a basic random walk.
+
+5. **Volatility scaling**: The observed price behavior shows larger absolute movements at higher price levels, consistent with the proportional volatility structure of GBM.
+
+While both models could be used, the GBM model provides a more economically realistic representation of BP stock price behavior, particularly in ensuring non-negative prices and modeling returns in percentage terms rather than absolute changes.
+</div>
+
+
+> b. What do the estimated GBM parameters tell you about BP stock's expected return and risk?
+
+<div class="solution">
+The estimated GBM parameters provide important insights about BP stock's expected return and risk:
+
+1. **Drift parameter (μ)**: The estimated annual drift of approximately [value from output] represents the expected annual return of BP stock. This parameter captures the long-term growth trend, incorporating both capital appreciation and dividend yield.
+
+2. **Volatility parameter (σ)**: The estimated annual volatility of approximately [value from output] quantifies the risk or uncertainty in BP stock returns. This represents the standard deviation of annual returns and indicates how much the actual returns typically deviate from the expected return.
+
+3. **Risk-return relationship**: The ratio of drift to volatility (μ/σ) is the Sharpe ratio (assuming zero risk-free rate), which measures the excess return per unit of risk. A higher ratio indicates better risk-adjusted performance.
+
+4. **Compounding effect**: The actual expected growth rate of the stock price is (μ - σ²/2) due to Jensen's inequality, which accounts for the asymmetric effect of volatility on compounded returns.
+
+5. **Probability distributions**: With these parameters, we can calculate the probability of the stock reaching various price levels over different time horizons. For example, there is approximately a 68% chance that the stock price will be within ±σ√T of the expected price after T years.
+
+These parameters suggest that BP stock offers [moderate/high/low] expected returns with [moderate/high/low] risk, which is [typical/atypical] for a company in the energy sector.
+</div>
+
+> c. How would you interpret the simulated future paths? What insights do they provide about potential price movements?
+
+<div class="solution">
+The simulated future paths provide several valuable insights about potential BP stock price movements:
+
+1. **Range of outcomes**: The spread of paths illustrates the uncertainty in future prices. The wide dispersion shows that even with the same underlying parameters, random chance can lead to significantly different outcomes.
+
+2. **Asymmetric distribution**: The paths demonstrate the log-normal distribution of future prices, with more paths showing moderate gains than extreme losses, reflecting the natural floor at zero for stock prices.
+
+3. **Path dependency**: Each path shows how the sequence of returns matters - two paths with the same average return but different sequencing can end at different price levels due to compounding effects.
+
+4. **Volatility clustering**: While the GBM model doesn't explicitly model volatility clustering, the simulated paths still show periods of relative calm and periods of larger price movements, similar to actual market behavior.
+
+5. **Probability assessment**: By generating many paths (100 in this case), we can estimate probabilities of different outcomes. For example, we could count what percentage of paths exceed a certain price threshold within the forecast horizon.
+
+6. **Risk management**: The simulations help quantify downside risk by showing potential adverse scenarios, which is valuable for risk management and setting stop-loss levels.
+
+7. **Option valuation**: These paths form the basis for Monte Carlo valuation of options and other derivatives on BP stock.
+
+The simulations remind us that point forecasts have limited value, and investors should consider the full distribution of possible outcomes when making decisions about BP stock.
+</div>
+
+> d. Compare the GBM approach with the ARIMA approach for modeling stock prices. What are the advantages and limitations of each?
+
+<div class="solution">
+**d. Compare the GBM approach with the ARIMA approach for modeling stock prices. What are the advantages and limitations of each?**
+
+**GBM Approach:**
+
+*Advantages:*
+1. Ensures non-negative prices, which is economically realistic for stocks
+2. Models returns in percentage terms, aligning with how investors evaluate performance
+3. Volatility scales naturally with price level
+4. Provides direct parameters for risk (volatility) and expected return (drift)
+5. Forms the theoretical foundation for option pricing models
+6. Simpler to implement with fewer parameters to estimate
+
+*Limitations:*
+1. Assumes log returns are normally distributed, which often understates tail risk
+2. Cannot capture autocorrelation in returns (market inefficiencies)
+3. Assumes constant volatility, missing volatility clustering effects
+4. May oversimplify the complex dynamics of actual market behavior
+5. Cannot model mean-reverting behavior that some stocks exhibit
+
+**ARIMA Approach:**
+
+*Advantages:*
+1. More flexible in capturing complex autocorrelation patterns in returns
+2. Can model mean reversion and other departures from pure random walks
+3. Provides a systematic framework for model identification and selection
+4. Can incorporate seasonal patterns and other cyclical behaviors
+5. Better at capturing short-term predictability when it exists
+
+*Limitations:*
+1. Does not naturally ensure non-negative prices
+2. Typically models absolute changes rather than percentage returns
+3. More complex with more parameters to estimate
+4. May overfit historical data, reducing forecast accuracy
+5. Parameters lack direct economic interpretation compared to GBM
+6. Does not naturally connect to option pricing theory
+
+**Best Practice:**
+The optimal approach often combines elements of both:
+- Use log transformations within ARIMA to ensure non-negativity (effectively modeling log prices)
+- Consider ARIMA models for log returns when there's evidence of return predictability
+- Extend GBM to allow for time-varying volatility (GARCH models) or jumps
+- Select models based on both statistical fit and economic reasoning
+</div>
+
+
+# Summary and Next Steps
+
+In this tutorial, you've learned:
+
+1. How different ARIMA components (AR, MA, ARMA) behave through simulation
+2. How to identify model patterns through ACF and PACF analysis
+3. The importance of the random walk model in financial time series
+4. How to begin the model selection process for real financial data
+
+In **Tutorial 6**, we'll complete the model building process by:
+- Fitting multiple candidate models to the BP stock data
+- Selecting the best model using information criteria
+- Performing model diagnostics
+- Generating and interpreting forecasts
+- Applying what we've learned to financial market concepts
+
+Before moving to the next tutorial, make sure you're comfortable with identifying patterns in ACF and PACF and understand how they relate to different ARIMA components.
+
+<!-- 
+Note on document structure:
+- Content is in this Quarto (.qmd) file
+- Presentation styling is in external CSS files (hw.css and tutorial-styles.css)
+- This separation of concerns is a best practice in web development
+-->

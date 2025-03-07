@@ -1,0 +1,35 @@
+/* Solution box styling */
+.solution {
+  background-color: #f5f5f5;
+  border-left: 5px solid #4CAF50;
+  padding: 10px;
+  margin-bottom: 15px;
+}
+
+/* Download and GitHub links container */
+.download-links {
+  margin-top: 20px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Link styling */
+.download-links a {
+  text-decoration: none;
+  color: #0366d6;
+  display: inline-flex;
+  align-items: center;
+}
+
+.download-links a:hover {
+  text-decoration: underline;
+}
+
+/* Icon spacing */
+.download-links i {
+  margin-right: 5px;
+}
